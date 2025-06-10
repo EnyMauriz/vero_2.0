@@ -1,0 +1,120 @@
+-- Criação do banco de dados
+CREATE DATABASE veroDB;
+
+-- Seleciona o banco de dados para uso
+USE veroDB;
+
+-- Criação da tabela usuario
+CREATE TABLE usuario (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    data_nascimento DATE NOT NULL,
+    login VARCHAR(50) NOT NULL UNIQUE,
+    senha VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE transacao (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    tipo ENUM('ENTRADA', 'SAIDA') NOT NULL,
+    valor DECIMAL(10,2) NOT NULL,
+    descricao VARCHAR(255),
+    data DATE NOT NULL,
+    FOREIGN KEY (usuario_id) REFERENCES usuario(id)
+);
+
+ALTER TABLE usuario
+ADD COLUMN saldo_disponivel DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+ADD COLUMN saldo_investido DECIMAL(10,2) NOT NULL DEFAULT 0.00;
+
+DELIMITER //
+
+CREATE TRIGGER atualizar_saldo_apos_transacao
+AFTER INSERT ON transacao
+FOR EACH ROW
+BEGIN
+    IF NEW.tipo = 'entrada' THEN
+        UPDATE usuario 
+        SET saldo_disponivel = saldo_disponivel + NEW.valor
+        WHERE id = NEW.usuario_id;
+    ELSEIF NEW.tipo = 'saida' THEN
+        UPDATE usuario 
+        SET saldo_disponivel = saldo_disponivel - NEW.valor
+        WHERE id = NEW.usuario_id;
+    END IF;
+END;
+//
+
+DELIMITER ;
+
+
+DELIMITER //
+
+CREATE TRIGGER desfazer_saldo_apos_exclusao
+AFTER DELETE ON transacao
+FOR EACH ROW
+BEGIN
+    IF OLD.tipo = 'entrada' THEN
+        UPDATE usuario 
+        SET saldo_disponivel = saldo_disponivel - OLD.valor
+        WHERE id = OLD.usuario_id;
+    ELSEIF OLD.tipo = 'saida' THEN
+        UPDATE usuario 
+        SET saldo_disponivel = saldo_disponivel + OLD.valor
+        WHERE id = OLD.usuario_id;
+    END IF;
+END;
+//
+
+DELIMITER ;
+
+CREATE TABLE investimento (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    tipo ENUM('ENTRADA', 'SAIDA') NOT NULL,
+    valor DECIMAL(10,2) NOT NULL,
+    descricao VARCHAR(255),
+    data DATE NOT NULL,
+    FOREIGN KEY (usuario_id) REFERENCES usuario(id)
+);
+
+DELIMITER //
+
+CREATE TRIGGER atualizar_saldo_apos_investimento
+AFTER INSERT ON investimento
+FOR EACH ROW
+BEGIN
+    IF NEW.tipo = 'entrada' THEN
+        UPDATE usuario 
+        SET saldo_investido = saldo_investido + NEW.valor
+        WHERE id = NEW.usuario_id;
+    ELSEIF NEW.tipo = 'saida' THEN
+        UPDATE usuario 
+        SET saldo_investido = saldo_investido - NEW.valor
+        WHERE id = NEW.usuario_id;
+    END IF;
+END;
+//
+
+DELIMITER ;
+
+
+DELIMITER //
+
+CREATE TRIGGER desfazer_saldo_apos_resgate
+AFTER DELETE ON investimento
+FOR EACH ROW
+BEGIN
+    IF OLD.tipo = 'entrada' THEN
+        UPDATE usuario 
+        SET saldo_investido = saldo_investido - OLD.valor
+        WHERE id = OLD.usuario_id;
+    ELSEIF OLD.tipo = 'saida' THEN
+        UPDATE usuario 
+        SET saldo_investido = saldo_investido + OLD.valor
+        WHERE id = OLD.usuario_id;
+    END IF;
+END;
+//
+
+DELIMITER ;
